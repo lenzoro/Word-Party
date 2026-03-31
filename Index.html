@@ -1,3 +1,11 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Word Party 🎉</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+</head>
+
 <body>
 
 <h1>Word Party 🎉</h1>
@@ -10,60 +18,49 @@
   <button onclick="joinRoom()">Join Room</button>
 </div>
 
-<!-- WAITING ROOM -->
+<!-- ROOM -->
 <div id="room" style="display:none;">
   <h2>Room: <span id="roomCode"></span></h2>
   <p id="playerList"></p>
   <button onclick="startSubmission()">Start Game</button>
 </div>
 
-<!-- WORD SUBMISSION -->
+<!-- SUBMISSION -->
 <div id="submission" style="display:none;">
   <h2>Enter 3 Words</h2>
-  <input id="word1"><input id="hint1">
-  <input id="word2"><input id="hint2">
-  <input id="word3"><input id="hint3">
-  <button onclick="submitWords()">Submit</button>
+  <input id="word1" placeholder="Word 1">
+  <input id="hint1" placeholder="Hint 1">
+  <input id="word2" placeholder="Word 2">
+  <input id="hint2" placeholder="Hint 2">
+  <input id="word3" placeholder="Word 3">
+  <input id="hint3" placeholder="Hint 3">
+  <button onclick="submitWords()">Submit Words</button>
+  
 </div>
 
 <!-- GAME -->
 <div id="game" style="display:none;">
   <h2 id="scrambledWord"></h2>
-  <input id="guessInput">
+
+  <input id="guessInput" placeholder="Your guess">
   <button onclick="submitGuess()">Guess</button>
+
   <button onclick="useHint()">Hint</button>
+  <button onclick="rescramble()">Rescramble</button>
+  
   <p id="hint"></p>
+
   <h3 id="timer"></h3>
 </div>
-
+  <div id="liveScores"></div>
 <!-- SCOREBOARD -->
 <div id="scoreboard" style="display:none;">
   <h2>Scores</h2>
   <div id="scores"></div>
 </div>
 
-<script src="app.js"></script>
+<!-- IMPORTANT: MODULE -->
+<script type="module" src="app.js"></script>
+
 </body>
-
-
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import { getFirestore, doc, setDoc, updateDoc, onSnapshot, getDoc } 
-    from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "YOUR_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  window.db = db;
-  window.doc = doc;
-  window.setDoc = setDoc;
-  window.updateDoc = updateDoc;
-  window.onSnapshot = onSnapshot;
-  window.getDoc = getDoc;
-</script>
+</html>

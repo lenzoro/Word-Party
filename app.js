@@ -1,143 +1,326 @@
+// 🔥 FIREBASE IMPORTS
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, doc, setDoc, updateDoc, getDoc, onSnapshot } 
+from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+// 🔌 CONFIG (PUT YOUR REAL KEYS)
+const firebaseConfig = {
+  apiKey: "AIzaSyA3s1IM2z5Ws6MREn9ZLohkY5_P3yBgwRs",
+  authDomain: "word-party-6de5a.firebaseapp.com",
+  projectId: "word-party-6de5a",
+};
+
+// INIT
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// 🔥 STATE
 let roomId = "";
 let playerName = "";
+let interval = null;
+let usedHint = false;
 
-async function createRoom() {
-  playerName = nameInput.value;
-  roomId = Math.random().toString(36).substring(2,7);
+// 🏠 CREATE ROOM
+window.createRoom = async function () {
+  playerName = document.getElementById("nameInput").value;
+  roomId = Math.random().toString(36).substring(2, 7);
 
-  await db.collection("rooms").doc(roomId).set({
+  await setDoc(doc(db, "rooms", roomId), {
     players: [playerName],
     host: playerName,
     phase: "lobby",
     words: [],
     currentIndex: 0,
-    scores: {}
+    scores: {},
+    time: 80
   });
 
   enterRoom();
+};
+
+// 🚪 JOIN ROOM
+window.joinRoom = async function () {
+  playerName = document.getElementById("nameInput").value;
+  roomId = document.getElementById("roomInput").value;
+
+  const ref = doc(db, "rooms", roomId);
+  const snap = await getDoc(ref);
+
+  if (!snap.exists()) {
+    alert("Room not found!");
+    return;
+  }
+
+  let data = snap.data();
+
+  await updateDoc(ref, {
+    players: [...data.players, playerName]
+  });
+
+  enterRoom();
+};
+
+// 🎮 ENTER ROOM
+function enterRoom() {
+  document.getElementById("lobby").style.display = "none";
+  document.getElementById("room").style.display = "block";
+  document.getElementById("roomCode").innerText = roomId;
+
+  listenToRoom();
 }
 
+// 👂 LISTENER
 function listenToRoom() {
-  db.collection("rooms").doc(roomId)
-    .onSnapshot(doc => {
-      const data = doc.data();
+  const ref = doc(db, "rooms", roomId);
 
-      updateUI(data);
-    });
+  onSnapshot(ref, (snap) => {
+    const data = snap.data();
+    if (!data) return;
+
+    updateUI(data);
+  });
 }
 
+// 🎨 UI
 function updateUI(data) {
   hideAll();
 
   if (data.phase === "lobby") show("room");
   if (data.phase === "submission") show("submission");
   if (data.phase === "game") show("game");
-  if (data.phase === "end") show("scoreboard");
+  if (data.phase === "end") {
+    show("scoreboard");
+    renderScores(data.scores);
+  }
 
-  playerList.innerText = data.players.join(", ");
+  document.getElementById("playerList").innerText = data.players.join(", ");
+
+  if (data.phase === "game") {
+    const current = data.words[data.currentIndex];
+    if (!current) return;
+
+    document.getElementById("scrambledWord").innerText = document.getElementById("scrambledWord").innerText = current.scrambled;//scrambleWord(current.word);
+    document.getElementById("timer").innerText = `Time: ${data.time}`;
+  }
 }
 
-async function submitWords() {
-  const words = [
-    { word: word1.value, hint: hint1.value, owner: playerName },
-    { word: word2.value, hint: hint2.value, owner: playerName },
-    { word: word3.value, hint: hint3.value, owner: playerName }
-  ];
-
-  const roomRef = db.collection("rooms").doc(roomId);
-  const doc = await roomRef.get();
-
-  let existing = doc.data().words || [];
-
-  await roomRef.update({
-    words: existing.concat(words)
+// UI HELPERS
+function hideAll() {
+  ["room", "submission", "game", "scoreboard"].forEach(id => {
+    document.getElementById(id).style.display = "none";
   });
 }
-function shuffle(array) {
-  return array.sort(() => Math.random() - 0.5);
+
+function show(id) {
+  document.getElementById(id).style.display = "block";
 }
 
-async function startGame() {
-  const roomRef = db.collection("rooms").doc(roomId);
-  const doc = await roomRef.get();
+// ▶️ START SUBMISSION
+window.startSubmission = async function () {
+  const ref = doc(db, "rooms", roomId);
+  await updateDoc(ref, { phase: "submission" });
+};
 
-  let words = shuffle(doc.data().words);
+// ✍️ SUBMIT WORDS
+window.submitWords = async function () {
+  const words = [
+    { word: word1.value.toLowerCase(), hint: hint1.value, owner: playerName },
+    { word: word2.value.toLowerCase(), hint: hint2.value, owner: playerName },
+    { word: word3.value.toLowerCase(), hint: hint3.value, owner: playerName }
+  ];
 
-  await roomRef.update({
+  const ref = doc(db, "rooms", roomId);
+  const snap = await getDoc(ref);
+  const data = snap.data();
+
+  let existing = data.words || [];
+
+  let updatedWords = [...existing, ...words];
+
+  await updateDoc(ref, {
+    words: updatedWords
+  });
+
+  alert("Words submitted!");
+
+  // 🔥 AUTO START CHECK
+  const totalPlayers = data.players.length;
+  const totalWordsNeeded = totalPlayers * 3;
+
+  if (updatedWords.length >= totalWordsNeeded) {
+    alert("All players submitted. Starting game...");
+
+    let shuffled = updatedWords.sort(() => Math.random() - 0.5);
+
+    await updateDoc(ref, {
+      words: shuffled,
+      phase: "game",
+      currentIndex: 0,
+      time: 80
+    });
+
+    startTimer();
+  }
+};
+
+// 🔀 SHUFFLE
+function scrambleWord2(word) {
+  return word.split("").sort(() => Math.random() - 0.5).join("");
+}
+
+// ▶️ START GAME
+ function scrambleWord(word) {
+  return word.split("").sort(() => Math.random() - 0.5).join("");
+}
+
+window.startGame = async function () {
+  const ref = doc(db, "rooms", roomId);
+  const snap = await getDoc(ref);
+
+  let words = snap.data().words.map(w => ({
+    ...w,
+    scrambled: scrambleWord(w.word)
+  }));
+
+  words = words.sort(() => Math.random() - 0.5);
+
+  await updateDoc(ref, {
     words,
     phase: "game",
     currentIndex: 0,
     time: 80
   });
-}
-function getCurrentWord(data) {
-  return data.words[data.currentIndex];
-}
+
+  startTimer();
+};
+
+// ⏱️ TIMER
 function startTimer() {
+  clearInterval(interval);
+
   interval = setInterval(async () => {
-    const ref = db.collection("rooms").doc(roomId);
-    const doc = await ref.get();
-    let time = doc.data().time;
+    const ref = doc(db, "rooms", roomId);
+    const snap = await getDoc(ref);
+    let time = snap.data().time;
 
     if (time <= 0) {
       nextWord();
       return;
     }
 
-    await ref.update({ time: time - 1 });
+    await updateDoc(ref, { time: time - 1 });
 
   }, 1000);
 }
+
+// ➡️ NEXT WORD
+let advancing = false;
+
 async function nextWord() {
-  const ref = db.collection("rooms").doc(roomId);
-  const doc = await ref.get();
+  if (advancing) return;
+  advancing = true;
 
-  let index = doc.data().currentIndex + 1;
+  const ref = doc(db, "rooms", roomId);
+  const snap = await getDoc(ref);
 
-  if (index >= doc.data().words.length) {
-    await ref.update({ phase: "end" });
+  let data = snap.data();
+  let index = data.currentIndex + 1;
+
+  if (index >= data.words.length) {
+    await updateDoc(ref, { phase: "end" });
+    advancing = false;
     return;
   }
 
-  await ref.update({
+  await updateDoc(ref, {
     currentIndex: index,
     time: 80
   });
+
+  advancing = false;
 }
-async function submitGuess() {
-  const guess = guessInput.value.toLowerCase();
-  const ref = db.collection("rooms").doc(roomId);
-  const doc = await ref.get();
-  const data = doc.data();
 
-  const current = getCurrentWord(data);
+// 🎯 GUESS
+window.submitGuess = async function () {
+  const guess = document.getElementById("guessInput").value.toLowerCase();
+  const ref = doc(db, "rooms", roomId);
+  const snap = await getDoc(ref);
+  const data = snap.data();
 
-  if (guess.length < 4) return;
+  const current = data.words[data.currentIndex];
+
+  if (!guess || guess.length < 4) return;
   if (/^(.)\1+$/.test(guess)) return;
 
-  if (guess === current.word) {
+ if (guess === current.word) {
 
-    let scores = data.scores;
-    scores[playerName] = (scores[playerName] || 0) + (usedHint ? 0.5 : 1);
-
-    scores[current.owner] = (scores[current.owner] || 0) + 0.25;
-
-    let newTime = Math.min(data.time + 3, 100);
-
-    await ref.update({
-      scores,
-      time: newTime
-    });
+  if (current.owner === playerName) {
+    alert("You can't guess your own word!");
+    return;
   }
+
+  let scores = data.scores || {};
+
+  scores[playerName] = (scores[playerName] || 0) + (usedHint ? 0.5 : 1);
+  scores[current.owner] = (scores[current.owner] || 0) + 0.25;
+
+  let newTime = Math.min(data.time + 3, 100);
+
+  await updateDoc(ref, {
+    scores,
+    time: newTime
+  });
+
+  alert("Correct!");
+
+  // 🔥 MOVE TO NEXT WORD IMMEDIATELY
+  nextWord();
 }
-function useHint(data) {
-  hint.innerText = getCurrentWord(data).hint;
+};
+
+// 💡 HINT
+window.useHint = async function () {
+  const ref = doc(db, "rooms", roomId);
+  const snap = await getDoc(ref);
+
+  const current = snap.data().words[snap.data().currentIndex];
+
+  document.getElementById("hint").innerText = current.hint;
   usedHint = true;
-}
+};
+
+// 🏆 SCORES
 function renderScores(scores) {
-  scoresDiv.innerHTML = "";
+  const div = document.getElementById("scores");
+  div.innerHTML = "";
 
   Object.entries(scores).forEach(([name, score]) => {
-    scoresDiv.innerHTML += `<p>${name}: ${score}</p>`;
+    div.innerHTML += `<p>${name}: ${score}</p>`;
+  });
+}
+
+//Rescramble
+window.rescramble = async function () {
+  const ref = doc(db, "rooms", roomId);
+  const snap = await getDoc(ref);
+  const data = snap.data();
+
+  let words = data.words;
+  let current = words[data.currentIndex];
+
+  current.scrambled = scrambleWord(current.word);
+
+  words[data.currentIndex] = current;
+
+  await updateDoc(ref, { words });
+};
+
+//Live Scores
+function renderLiveScores(scores) {
+  const div = document.getElementById("liveScores");
+  div.innerHTML = "<h3>Scores</h3>";
+
+  Object.entries(scores || {}).forEach(([name, score]) => {
+    div.innerHTML += `<p>${name}: ${score}</p>`;
   });
 }
