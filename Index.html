@@ -1,0 +1,46 @@
+<body>
+
+<h1>Word Party 🎉</h1>
+
+<!-- LOBBY -->
+<div id="lobby">
+  <input id="nameInput" placeholder="Your Name">
+  <input id="roomInput" placeholder="Room Code">
+  <button onclick="createRoom()">Create Room</button>
+  <button onclick="joinRoom()">Join Room</button>
+</div>
+
+<!-- WAITING ROOM -->
+<div id="room" style="display:none;">
+  <h2>Room: <span id="roomCode"></span></h2>
+  <p id="playerList"></p>
+  <button onclick="startSubmission()">Start Game</button>
+</div>
+
+<!-- WORD SUBMISSION -->
+<div id="submission" style="display:none;">
+  <h2>Enter 3 Words</h2>
+  <input id="word1"><input id="hint1">
+  <input id="word2"><input id="hint2">
+  <input id="word3"><input id="hint3">
+  <button onclick="submitWords()">Submit</button>
+</div>
+
+<!-- GAME -->
+<div id="game" style="display:none;">
+  <h2 id="scrambledWord"></h2>
+  <input id="guessInput">
+  <button onclick="submitGuess()">Guess</button>
+  <button onclick="useHint()">Hint</button>
+  <p id="hint"></p>
+  <h3 id="timer"></h3>
+</div>
+
+<!-- SCOREBOARD -->
+<div id="scoreboard" style="display:none;">
+  <h2>Scores</h2>
+  <div id="scores"></div>
+</div>
+
+<script src="app.js"></script>
+</body>

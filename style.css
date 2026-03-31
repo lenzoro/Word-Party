@@ -1,0 +1,23 @@
+body {
+  font-family: Arial;
+  text-align: center;
+  background: #0f172a;
+  color: white;
+}
+
+input, button {
+  padding: 12px;
+  margin: 5px;
+  border-radius: 8px;
+}
+
+button {
+  background: #22c55e;
+  border: none;
+  color: white;
+}
+
+#scrambledWord {
+  font-size: 36px;
+  letter-spacing: 8px;
+}
