@@ -21,3 +21,27 @@ button {
   font-size: 36px;
   letter-spacing: 8px;
 }
+#scrambledWord {
+  font-size: 2rem;
+  transition: transform 0.3s ease;
+}
+
+#scrambledWord:hover {
+  transform: scale(1.1);
+}
+#room {
+  text-align: center;
+}
+
+#startBtn {
+  display: block;
+  margin: 10px auto;
+}
+@keyframes pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animateWord {
+  animation: pop 0.3s ease;
+}

@@ -3,14 +3,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getFirestore, doc, setDoc, updateDoc, getDoc, onSnapshot } 
 from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// 🔌 CONFIG (PUT YOUR REAL KEYS)
+// 🔌 CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyA3s1IM2z5Ws6MREn9ZLohkY5_P3yBgwRs",
   authDomain: "word-party-6de5a.firebaseapp.com",
   projectId: "word-party-6de5a",
 };
 
-// INIT
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
@@ -19,10 +18,66 @@ let roomId = "";
 let playerName = "";
 let interval = null;
 let usedHint = false;
+let lastScoresJSON = "";
+let lastWordIndex = -1;
+let audioReady = false;
+let soundEnabled = true;
+
+// 🔊 AUDIO UNLOCK (UNCHANGED CORE)
+document.addEventListener("click", () => {
+  if (audioReady) return;
+
+  const correct = document.getElementById("correctSound");
+  const tick = document.getElementById("tickSound");
+
+  if (!correct || !tick) return;
+
+  correct.muted = true;
+  tick.muted = true;
+
+  correct.play().then(() => {
+    correct.pause();
+    correct.currentTime = 0;
+    correct.muted = false;
+  }).catch(() => {});
+
+  tick.play().then(() => {
+    tick.pause();
+    tick.currentTime = 0;
+    tick.muted = false;
+  }).catch(() => {});
+
+  audioReady = true;
+});
+
+// 🔊 TOGGLE SOUND
+window.toggleSound = function () {
+  soundEnabled = !soundEnabled;
+  alert(soundEnabled ? "🔊 Sound ON" : "🔇 Sound OFF");
+};
+
+// 🔊 PLAY SOUND
+function playSound(id) {
+  if (!audioReady || !soundEnabled) return;
+
+  const audio = document.getElementById(id);
+  if (!audio) return;
+
+  audio.pause();
+  audio.currentTime = 0;
+  audio.play().catch(() => {});
+}
 
 // 🏠 CREATE ROOM
 window.createRoom = async function () {
-  playerName = document.getElementById("nameInput").value;
+  const nameInput = document.getElementById("nameInput");
+
+  if (!nameInput.value) {
+    alert("Enter your name");
+    return;
+  }
+
+  playerName = nameInput.value;
   roomId = Math.random().toString(36).substring(2, 7);
 
   await setDoc(doc(db, "rooms", roomId), {
@@ -88,6 +143,7 @@ function updateUI(data) {
   if (data.phase === "lobby") show("room");
   if (data.phase === "submission") show("submission");
   if (data.phase === "game") show("game");
+
   if (data.phase === "end") {
     show("scoreboard");
     renderScores(data.scores);
@@ -95,18 +151,36 @@ function updateUI(data) {
 
   document.getElementById("playerList").innerText = data.players.join(", ");
 
+  const startBtn = document.getElementById("startBtn");
+  if (startBtn) {
+    startBtn.style.display = data.host === playerName ? "block" : "none";
+  }
+
   if (data.phase === "game") {
     const current = data.words[data.currentIndex];
     if (!current) return;
 
-  if (current.owner === playerName) {
-  document.getElementById("scrambledWord").innerText = "⛔ Your word";
-} else {
-  document.getElementById("scrambledWord").innerText = current.scrambled;
-}//scrambleWord(current.word);
+    const el = document.getElementById("scrambledWord");
+
+    if (data.currentIndex !== lastWordIndex) {
+      document.getElementById("guessInput").value = "";
+      document.getElementById("hint").innerText = "";
+      usedHint = false;
+
+      el.classList.remove("animateWord");
+      void el.offsetWidth;
+      el.classList.add("animateWord");
+
+      lastWordIndex = data.currentIndex;
+    }
+
+    el.innerText =
+      current.owner === playerName ? "⛔ Your word" : current.scrambled;
+
     document.getElementById("timer").innerText = `Time: ${data.time}`;
+
+    renderLiveScores(data.scores);
   }
-  renderLiveScores(data.scores);
 }
 
 // UI HELPERS
@@ -126,6 +200,46 @@ window.startSubmission = async function () {
   await updateDoc(ref, { phase: "submission" });
 };
 
+// 🔀 SCRAMBLE
+function scrambleWord(word) {
+  let scrambled = word;
+  let attempts = 0;
+
+  while (scrambled === word && attempts < 10) {
+    scrambled = word.split("").sort(() => Math.random() - 0.5).join("");
+    attempts++;
+  }
+
+  return scrambled;
+}
+
+// 🔁 ALTERNATE WORDS
+function alternateWords(words) {
+  const grouped = {};
+
+  words.forEach(w => {
+    if (!grouped[w.owner]) grouped[w.owner] = [];
+    grouped[w.owner].push(w);
+  });
+
+  const owners = Object.keys(grouped);
+  let result = [];
+  let stillWords = true;
+
+  while (stillWords) {
+    stillWords = false;
+
+    for (let owner of owners) {
+      if (grouped[owner].length > 0) {
+        result.push(grouped[owner].shift());
+        stillWords = true;
+      }
+    }
+  }
+
+  return result;
+}
+
 // ✍️ SUBMIT WORDS
 window.submitWords = async function () {
   const words = [
@@ -140,67 +254,38 @@ window.submitWords = async function () {
 
   let existing = data.words || [];
 
-  let updatedWords = [...existing, ...words];
+  let filteredNew = words.filter(newWord =>
+    !existing.some(e => e.word === newWord.word && e.owner === newWord.owner)
+  );
 
-  await updateDoc(ref, {
-    words: updatedWords
-  });
+  let updatedWords = [...existing, ...filteredNew];
+
+  await updateDoc(ref, { words: updatedWords });
 
   alert("Words submitted!");
 
-  // 🔥 AUTO START CHECK
-  const totalPlayers = data.players.length;
-const totalWordsNeeded = totalPlayers * 3;
+  if (
+    updatedWords.length >= data.players.length * 3 &&
+    data.host === playerName
+  ) {
+    let prepared = updatedWords.map(w => ({
+      ...w,
+      scrambled: scrambleWord(w.word),
+      used: false
+    }));
 
-if (updatedWords.length >= totalWordsNeeded) {
-  alert("All players submitted. Starting game...");
+    let ordered = alternateWords(prepared);
 
-  let shuffled = updatedWords.map(w => ({
-    ...w,
-    scrambled: scrambleWord(w.word)
-  })).sort(() => Math.random() - 0.5);
+    await updateDoc(ref, {
+      words: ordered,
+      phase: "game",
+      currentIndex: 0,
+      time: 80
+    });
 
-  await updateDoc(ref, {
-    words: shuffled,
-    phase: "game",
-    currentIndex: 0,
-    time: 80
-  });
-
-  startTimer();
+    startTimer();
+  }
 }
-};
-
-// 🔀 SHUFFLE
-function scrambleWord2(word) {
-  return word.split("").sort(() => Math.random() - 0.5).join("");
-}
-
-// ▶️ START GAME
- function scrambleWord(word) {
-  return word.split("").sort(() => Math.random() - 0.5).join("");
-}
-
-window.startGame = async function () {
-  const ref = doc(db, "rooms", roomId);
-  const snap = await getDoc(ref);
-
-  let words = snap.data().words.map(w => ({
-    ...w,
-    scrambled: scrambleWord(w.word)
-  }));
-
-  words = words.sort(() => Math.random() - 0.5);
-
-  await updateDoc(ref, {
-    words,
-    phase: "game",
-    currentIndex: 0,
-    time: 80
-  });
-
-  startTimer();
-};
 
 // ⏱️ TIMER
 function startTimer() {
@@ -209,19 +294,24 @@ function startTimer() {
   interval = setInterval(async () => {
     const ref = doc(db, "rooms", roomId);
     const snap = await getDoc(ref);
-    let time = snap.data().time;
+    const data = snap.data();
+
+    if (!data) return;
+
+    let time = data.time;
 
     if (time <= 0) {
       nextWord();
       return;
     }
 
+    if (time <= 10 && time % 2 === 0) {
+      playSound("tickSound");
+    }
+
     await updateDoc(ref, { time: time - 1 });
 
   }, 1000);
-  if (time <= 10) {
-  document.getElementById("tickSound").play();
-}
 }
 
 // ➡️ NEXT WORD
@@ -231,11 +321,26 @@ async function nextWord() {
   if (advancing) return;
   advancing = true;
 
+  const tick = document.getElementById("tickSound");
+  if (tick) {
+    tick.pause();
+    tick.currentTime = 0;
+  }
+
   const ref = doc(db, "rooms", roomId);
   const snap = await getDoc(ref);
+  const data = snap.data();
 
-  let data = snap.data();
+  if (!data) {
+    advancing = false;
+    return;
+  }
+
   let index = data.currentIndex + 1;
+
+  while (index < data.words.length && data.words[index].used) {
+    index++;
+  }
 
   if (index >= data.words.length) {
     await updateDoc(ref, { phase: "end" });
@@ -262,39 +367,28 @@ window.submitGuess = async function () {
 
   if (!guess || guess.length < 4) return;
   if (/^(.)\1+$/.test(guess)) return;
+  if (current.owner === playerName) return;
 
- if (guess === current.word) {
+  if (guess === current.word) {
 
-  if (current.owner === playerName) {
-    alert("You can't guess your own word!");
-    return;
+    let speedBonus = Math.max(data.time / 80, 0.2);
+    let basePoints = usedHint ? 0.5 : 1;
+    let totalPoints = basePoints * speedBonus;
+
+    let scores = data.scores || {};
+    let words = data.words;
+
+    words[data.currentIndex].used = true;
+
+    scores[playerName] = Number(((scores[playerName] || 0) + totalPoints).toFixed(2));
+    scores[current.owner] = Number(((scores[current.owner] || 0) + 0.25).toFixed(2));
+
+    await updateDoc(ref, { scores, words });
+
+    playSound("correctSound");
+
+    setTimeout(() => nextWord(), 800);
   }
-
-  let scores = data.scores || {};
-  let speedBonus = Math.max(data.time / 80, 0.2); // 0.2 min
-
-let basePoints = usedHint ? 0.5 : 1;
-let totalPoints = basePoints * speedBonus;
-
-scores[playerName] = (scores[playerName] || 0) + totalPoints;
-  //scores[playerName] = (scores[playerName] || 0) + (usedHint ? 0.5 : 1);
-  scores[current.owner] = (scores[current.owner] || 0) + 0.25;
-
-  let newTime = Math.min(data.time + 3, 100);
-
-  await updateDoc(ref, {
-    scores,
-    time: newTime
-  });
-
-  alert("Correct!");
-
-  // 🔥 MOVE TO NEXT WORD IMMEDIATELY
-  nextWord();
-}
-document.getElementById("correctSound").play();
-document.getElementById("guessInput").value = "";
-
 };
 
 // 💡 HINT
@@ -308,50 +402,79 @@ window.useHint = async function () {
   usedHint = true;
 };
 
-// 🏆 SCORES
+// 🏆 FINAL SCORES
 function renderScores(scores) {
+  const json = JSON.stringify(scores);
+  if (json === lastScoresJSON) return;
+  lastScoresJSON = json;
+
   const div = document.getElementById("scores");
   div.innerHTML = "";
 
-  Object.entries(scores).forEach(([name, score]) => {
-    div.innerHTML += `<p>${name}: ${score}</p>`;
-  });
-}
+  let sorted = Object.entries(scores || {}).sort((a, b) => b[1] - a[1]);
 
-//Rescramble
-window.rescramble = async function () {
-  const ref = doc(db, "rooms", roomId);
-  const snap = await getDoc(ref);
-  const data = snap.data();
-
-  let words = data.words;
-  let current = words[data.currentIndex];
-
-  current.scrambled = scrambleWord(current.word);
-
-  words[data.currentIndex] = current;
-
-  await updateDoc(ref, { words });
-};
-
-//Live Scores
-function renderLiveScores(scores) {
-  const div = document.getElementById("liveScores");
-
-  let sorted = Object.entries(scores || {})
-    .sort((a, b) => b[1] - a[1]);
-
-  div.innerHTML = "<h3>🏆 Live Scores</h3>";
+  if (sorted.length > 0) {
+    div.innerHTML += `<h2>🏆 Winner: ${sorted[0][0]}</h2>`;
+  }
 
   sorted.forEach(([name, score]) => {
     div.innerHTML += `<p>${name}: ${score.toFixed(2)}</p>`;
   });
 }
 
-//Skip
-window.skipWord = async function () {
-  const ref = doc(db, "rooms", roomId);
+// 📊 LIVE SCORES
+function renderLiveScores(scores) {
+  const div = document.getElementById("liveScores");
 
-  alert("Word skipped!");
+  let sorted = Object.entries(scores || {})
+    .sort((a, b) => b[1] - a[1]);
+
+  div.innerHTML = "<h3>Scores</h3>";
+
+  sorted.forEach(([name, score]) => {
+    div.innerHTML += `<p>${name}: ${score.toFixed(2)}</p>`;
+  });
+}
+
+// 🔁 REPLAY
+window.replayGame = async function () {
+  const ref = doc(db, "rooms", roomId);
+  const snap = await getDoc(ref);
+  const data = snap.data();
+
+  if (data.host !== playerName) {
+    alert("Only host can restart");
+    return;
+  }
+
+  await updateDoc(ref, {
+    phase: "lobby",
+    words: [],
+    currentIndex: 0,
+    time: 80,
+    scores: {}
+  });
+};
+
+// ⏭️ SKIP
+window.skipWord = function () {
   nextWord();
+};
+
+// 🔀 RESCRAMBLE
+window.rescramble = async function () {
+  const ref = doc(db, "rooms", roomId);
+  const snap = await getDoc(ref);
+  const data = snap.data();
+
+  if (!data) return;
+
+  let words = data.words;
+  let current = words[data.currentIndex];
+
+  if (!current) return;
+
+  current.scrambled = scrambleWord(current.word);
+
+  await updateDoc(ref, { words });
 };
