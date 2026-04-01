@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Word Party 🎉</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+  <audio id="correctSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
+<audio id="tickSound" src="https://www.soundjay.com/clock/sounds/clock-ticking-1.mp3"></audio>
+</head>
+
+<body>
+
+<h1>Word Party 🎉</h1>
+
+<!-- LOBBY -->
+<div id="lobby">
+  <input id="nameInput" placeholder="Your Name">
+  <input id="roomInput" placeholder="Room Code">
+  <button onclick="createRoom()">Create Room</button>
+  <button onclick="joinRoom()">Join Room</button>
+</div>
+
+<!-- ROOM -->
+<div id="room" style="display:none;">
+  <h2>Room: <span id="roomCode"></span></h2>
+  <p id="playerList"></p>
+  <button onclick="startSubmission()">Start Game</button>
+</div>
+
+<!-- SUBMISSION -->
+<div id="submission" style="display:none;">
+  <h2>Enter 3 Words</h2>
+  <input id="word1" placeholder="Word 1">
+  <input id="hint1" placeholder="Hint 1">
+  <input id="word2" placeholder="Word 2">
+  <input id="hint2" placeholder="Hint 2">
+  <input id="word3" placeholder="Word 3">
+  <input id="hint3" placeholder="Hint 3">
+  <button onclick="submitWords()">Submit Words</button>
+  
+</div>
+
+<!-- GAME -->
+<div id="game" style="display:none;">
+  <h2 id="scrambledWord"></h2>
+  <button onclick="skipWord()">Skip</button>
+  <input id="guessInput" placeholder="Your guess">
+  <button onclick="submitGuess()">Guess</button>
+
+  <button onclick="useHint()">Hint</button>
+  <button onclick="rescramble()">Rescramble</button>
+    <div id="liveScores"></div>
+  
+  <p id="hint"></p>
+
+  <h3 id="timer"></h3>
+</div>
+
+<!-- SCOREBOARD -->
+<div id="scoreboard" style="display:none;">
+  <h2>Scores</h2>
+  <div id="scores"></div>
+</div>
+
+<!-- IMPORTANT: MODULE -->
+<script type="module" src="app.js"></script>
+
+</body>
+</html>
