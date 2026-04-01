@@ -4,6 +4,8 @@
   <title>Word Party 🎉</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
+  <audio id="correctSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
+<audio id="tickSound" src="https://www.soundjay.com/clock/sounds/clock-ticking-1.mp3"></audio>
 </head>
 
 <body>
@@ -41,18 +43,19 @@
 <!-- GAME -->
 <div id="game" style="display:none;">
   <h2 id="scrambledWord"></h2>
-
+  <button onclick="skipWord()">Skip</button>
   <input id="guessInput" placeholder="Your guess">
   <button onclick="submitGuess()">Guess</button>
 
   <button onclick="useHint()">Hint</button>
   <button onclick="rescramble()">Rescramble</button>
+    <div id="liveScores"></div>
   
   <p id="hint"></p>
 
   <h3 id="timer"></h3>
 </div>
-  <div id="liveScores"></div>
+
 <!-- SCOREBOARD -->
 <div id="scoreboard" style="display:none;">
   <h2>Scores</h2>

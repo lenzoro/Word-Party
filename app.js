@@ -99,9 +99,14 @@ function updateUI(data) {
     const current = data.words[data.currentIndex];
     if (!current) return;
 
-    document.getElementById("scrambledWord").innerText = document.getElementById("scrambledWord").innerText = current.scrambled;//scrambleWord(current.word);
+  if (current.owner === playerName) {
+  document.getElementById("scrambledWord").innerText = "⛔ Your word";
+} else {
+  document.getElementById("scrambledWord").innerText = current.scrambled;
+}//scrambleWord(current.word);
     document.getElementById("timer").innerText = `Time: ${data.time}`;
   }
+  renderLiveScores(data.scores);
 }
 
 // UI HELPERS
@@ -145,22 +150,25 @@ window.submitWords = async function () {
 
   // 🔥 AUTO START CHECK
   const totalPlayers = data.players.length;
-  const totalWordsNeeded = totalPlayers * 3;
+const totalWordsNeeded = totalPlayers * 3;
 
-  if (updatedWords.length >= totalWordsNeeded) {
-    alert("All players submitted. Starting game...");
+if (updatedWords.length >= totalWordsNeeded) {
+  alert("All players submitted. Starting game...");
 
-    let shuffled = updatedWords.sort(() => Math.random() - 0.5);
+  let shuffled = updatedWords.map(w => ({
+    ...w,
+    scrambled: scrambleWord(w.word)
+  })).sort(() => Math.random() - 0.5);
 
-    await updateDoc(ref, {
-      words: shuffled,
-      phase: "game",
-      currentIndex: 0,
-      time: 80
-    });
+  await updateDoc(ref, {
+    words: shuffled,
+    phase: "game",
+    currentIndex: 0,
+    time: 80
+  });
 
-    startTimer();
-  }
+  startTimer();
+}
 };
 
 // 🔀 SHUFFLE
@@ -211,6 +219,9 @@ function startTimer() {
     await updateDoc(ref, { time: time - 1 });
 
   }, 1000);
+  if (time <= 10) {
+  document.getElementById("tickSound").play();
+}
 }
 
 // ➡️ NEXT WORD
@@ -260,8 +271,13 @@ window.submitGuess = async function () {
   }
 
   let scores = data.scores || {};
+  let speedBonus = Math.max(data.time / 80, 0.2); // 0.2 min
 
-  scores[playerName] = (scores[playerName] || 0) + (usedHint ? 0.5 : 1);
+let basePoints = usedHint ? 0.5 : 1;
+let totalPoints = basePoints * speedBonus;
+
+scores[playerName] = (scores[playerName] || 0) + totalPoints;
+  //scores[playerName] = (scores[playerName] || 0) + (usedHint ? 0.5 : 1);
   scores[current.owner] = (scores[current.owner] || 0) + 0.25;
 
   let newTime = Math.min(data.time + 3, 100);
@@ -276,6 +292,9 @@ window.submitGuess = async function () {
   // 🔥 MOVE TO NEXT WORD IMMEDIATELY
   nextWord();
 }
+document.getElementById("correctSound").play();
+document.getElementById("guessInput").value = "";
+
 };
 
 // 💡 HINT
@@ -318,9 +337,21 @@ window.rescramble = async function () {
 //Live Scores
 function renderLiveScores(scores) {
   const div = document.getElementById("liveScores");
-  div.innerHTML = "<h3>Scores</h3>";
 
-  Object.entries(scores || {}).forEach(([name, score]) => {
-    div.innerHTML += `<p>${name}: ${score}</p>`;
+  let sorted = Object.entries(scores || {})
+    .sort((a, b) => b[1] - a[1]);
+
+  div.innerHTML = "<h3>🏆 Live Scores</h3>";
+
+  sorted.forEach(([name, score]) => {
+    div.innerHTML += `<p>${name}: ${score.toFixed(2)}</p>`;
   });
 }
+
+//Skip
+window.skipWord = async function () {
+  const ref = doc(db, "rooms", roomId);
+
+  alert("Word skipped!");
+  nextWord();
+};
