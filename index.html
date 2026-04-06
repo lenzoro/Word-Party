@@ -4,29 +4,30 @@
   <title>Word Party 🎉</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="style.css">
-  
 </head>
 
 <body>
 
 <h1>Word Party 🎉</h1>
-<audio id="correctSound" src="correct.mp3"></audio>
-<audio id="tickSound" src="tick.mp3"></audio>
+<audio id="correctSound" src="./correct.mp3"></audio>
+<audio id="tickSound" src="./tick.mp3"></audio>
+
 <!-- LOBBY -->
 <div id="lobby">
   <input id="nameInput" placeholder="Your Name">
   <input id="roomInput" placeholder="Room Code">
   <button onclick="createRoom()">Create Room</button>
   <button onclick="joinRoom()">Join Room</button>
- <button onclick="toggleAudio()">Toggle Sound 🔊</button>
-
+  <button onclick="toggleSound()">Toggle Sound 🔊</button>
 </div>
 
 <!-- ROOM -->
 <div id="room" style="display:none;">
   <h2>Room: <span id="roomCode"></span></h2>
   <p id="playerList"></p>
- <button id="startBtn" onclick="startSubmission()">Start Game</button>
+
+  <button id="submissionBtn" onclick="startSubmission()">Start Submissions</button>
+
 </div>
 
 <!-- SUBMISSION -->
@@ -38,21 +39,24 @@
   <input id="hint2" placeholder="Hint 2">
   <input id="word3" placeholder="Word 3">
   <input id="hint3" placeholder="Hint 3">
+  <p id="submissionStatus"></p>
   <button onclick="submitWords()">Submit Words</button>
-  
+    <button id="startBtn" onclick="startGame()">Start Game ▶️</button>
 </div>
 
 <!-- GAME -->
 <div id="game" style="display:none;">
   <h2 id="scrambledWord"></h2>
+
   <button onclick="skipWord()">Skip</button>
+
   <input id="guessInput" placeholder="Your guess">
   <button onclick="submitGuess()">Guess</button>
 
   <button onclick="useHint()">Hint</button>
   <button onclick="rescramble()">Rescramble</button>
-    <div id="liveScores"></div>
-  
+
+  <div id="liveScores"></div>
   <p id="hint"></p>
 
   <h3 id="timer"></h3>
@@ -65,8 +69,6 @@
   <button onclick="replayGame()">Play Again 🔁</button>
 </div>
 
-<!-- IMPORTANT: MODULE -->
 <script type="module" src="app.js"></script>
-
 </body>
 </html>
