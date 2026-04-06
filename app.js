@@ -31,7 +31,8 @@ document.addEventListener("click", () => {
   const tick = document.getElementById("tickSound");
 
   if (!correct || !tick) return;
-
+    correct.load();
+  tick.load();
   correct.muted = true;
   tick.muted = true;
 
@@ -82,6 +83,7 @@ window.createRoom = async function () {
 
   await setDoc(doc(db, "rooms", roomId), {
     players: [playerName],
+    submittedPlayers: [], // ✅ NEW
     host: playerName,
     phase: "lobby",
     words: [],
@@ -149,8 +151,18 @@ function updateUI(data) {
     renderScores(data.scores);
   }
 
-  document.getElementById("playerList").innerText = data.players.join(", ");
+const submitted = data.submittedPlayers || [];
+const notSubmitted = data.players.filter(p => !submitted.includes(p));
 
+if (data.phase === "submission") {
+  document.getElementById("submissionStatus").innerText =
+    "Players: " + data.players.join(", ") +
+    "\nSubmitted: " + submitted.join(", ") +
+    "\nWaiting on: " + notSubmitted.join(", ");
+} else {
+  document.getElementById("playerList").innerText =
+    "Players: " + data.players.join(", ");
+}
   const startBtn = document.getElementById("startBtn");
   if (startBtn) {
     startBtn.style.display = data.host === playerName ? "block" : "none";
@@ -260,31 +272,40 @@ window.submitWords = async function () {
 
   let updatedWords = [...existing, ...filteredNew];
 
-  await updateDoc(ref, { words: updatedWords });
+ let submitted = data.submittedPlayers || [];
+
+if (!submitted.includes(playerName)) {
+  submitted.push(playerName);
+}
+
+await updateDoc(ref, { 
+  words: updatedWords,
+  submittedPlayers: submitted // ✅ NEW
+});
 
   alert("Words submitted!");
 
-  if (
-    updatedWords.length >= data.players.length * 3 &&
-    data.host === playerName
-  ) {
-    let prepared = updatedWords.map(w => ({
-      ...w,
-      scrambled: scrambleWord(w.word),
-      used: false
-    }));
+  //if (
+  //  updatedWords.length >= data.players.length * 3 &&
+//    data.host === playerName
+ // ) {
+  //  let prepared = updatedWords.map(w => ({
+   //   ...w,
+  //    scrambled: scrambleWord(w.word),
+   //   used: false
+  //  }));
 
-    let ordered = alternateWords(prepared);
+   // let ordered = alternateWords(prepared);
+//
+ //   await updateDoc(ref, {
+ //     words: ordered,
+ //     phase: "game",
+ //     currentIndex: 0,
+ //     time: 80
+  //  });
 
-    await updateDoc(ref, {
-      words: ordered,
-      phase: "game",
-      currentIndex: 0,
-      time: 80
-    });
-
-    startTimer();
-  }
+  //  startTimer();
+ // }
 }
 
 // ⏱️ TIMER
@@ -478,3 +499,42 @@ window.rescramble = async function () {
 
   await updateDoc(ref, { words });
 };
+// ▶️ HOST START GAME MANUALLY
+window.startGame = async function () {
+  const ref = doc(db, "rooms", roomId);
+  const snap = await getDoc(ref);
+  const data = snap.data();
+
+  if (data.host !== playerName) {
+    alert("Only host can start");
+    return;
+  }
+
+  if (!data.words || data.words.length < data.players.length * 3) {
+    alert("Not all players submitted yet");
+    return;
+  }
+
+  let prepared = data.words.map(w => ({
+    ...w,
+    scrambled: scrambleWord(w.word),
+    used: false
+  }));
+
+  let ordered = alternateWords(prepared);
+
+  await updateDoc(ref, {
+    words: ordered,
+    phase: "game",
+    currentIndex: 0,
+    time: 80
+  });
+
+  startTimer();
+};
+// 📱 MOBILE FIX (ENTER TO GUESS)
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    submitGuess();
+  }
+});
